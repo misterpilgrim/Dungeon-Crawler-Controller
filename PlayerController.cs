@@ -5,14 +5,14 @@ using UnityEngine;
 public class PlayerController : MonoBehaviour
 {
     private enum Compass { North, South, East, West };
-    private Compass compass;
-    private Vector3 target;
-    private Quaternion view;
-    private bool moving;
-    private bool turning;
-    public float movespeed;
-    public float rotatespeed;
-    public float distance;
+    private Compass compass; // controller's current NSEW direction
+    private Vector3 target; // coordinates the controller is constantly moving towards
+    private Quaternion view; // new angle to set controller rotation as for a turn
+    private bool moving; // is currently moving?
+    private bool turning; // is currently turning?
+    public float movespeed; // preference: 20
+    public float rotatespeed; // preference: 500
+    public float distance; // distance controller travels every step
 
     private void Start()
     {
@@ -23,16 +23,18 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        // move towards target position + rotation every frame (determined by input)
         transform.position = Vector3.MoveTowards(transform.position, target, movespeed * Time.deltaTime);
         transform.rotation = Quaternion.RotateTowards(transform.rotation, view, rotatespeed * Time.deltaTime);
 
-        TurnCheck();
+        // manages true/false for if controller is moving or turning
         StepCheck();
+        TurnCheck();
 
         if (Input.GetKey(KeyCode.W)) // forward
         {
             Debug.Log("Walked FORWARD");
-            Step("Forward");
+            StartCoroutine(StepDelay("Forward"));
         }
         else if (Input.GetKeyDown(KeyCode.A)) // left turn
         {
@@ -42,12 +44,22 @@ public class PlayerController : MonoBehaviour
         else if (Input.GetKey(KeyCode.S)) // backward
         {
             Debug.Log("Walked BACKWARD");
-            Step("Backward");
+            StartCoroutine(StepDelay("Backward"));
         }
         else if (Input.GetKeyDown(KeyCode.D)) // right turn
         {
             Debug.Log("Turned RIGHT");
             Turn("Right");
+        }
+        else if (Input.GetKey(KeyCode.Q)) // left sidestep
+        {
+            Debug.Log("Slid LEFT");
+            StartCoroutine(StepDelay("Left"));
+        }
+        else if (Input.GetKey(KeyCode.E)) // right sidestep
+        {
+            Debug.Log("Slid RIGHT");
+            StartCoroutine(StepDelay("Right"));
         }
     }
 
@@ -128,6 +140,84 @@ public class PlayerController : MonoBehaviour
                         break;
                     }
                     target = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
+                    break;
+            }
+        }
+
+        // handles left slides
+        else if (direction == "Left" && moving == false && turning == false)
+        {
+            switch (compass)
+            {
+                case Compass.North:
+                    if (WallCheck(Vector3.left))
+                    {
+                        break;
+                    }
+                    target = new Vector3(transform.position.x - distance, transform.position.y, transform.position.z);
+                    break;
+
+                case Compass.South:
+                    if (WallCheck(Vector3.right))
+                    {
+                        break;
+                    }
+                    target = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
+                    break;
+
+                case Compass.East:
+                    if (WallCheck(Vector3.forward))
+                    {
+                        break;
+                    }
+                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z + distance);
+                    break;
+
+                case Compass.West:
+                    if (WallCheck(Vector3.back))
+                    {
+                        break;
+                    }
+                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z - distance);
+                    break;
+            }
+        }
+
+        // handles right slides
+        else if (direction == "Right" && moving == false && turning == false)
+        {
+            switch (compass)
+            {
+                case Compass.North:
+                    if (WallCheck(Vector3.right))
+                    {
+                        break;
+                    }
+                    target = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
+                    break;
+
+                case Compass.South:
+                    if (WallCheck(Vector3.left))
+                    {
+                        break;
+                    }
+                    target = new Vector3(transform.position.x - distance, transform.position.y, transform.position.z);
+                    break;
+
+                case Compass.East:
+                    if (WallCheck(Vector3.back))
+                    {
+                        break;
+                    }
+                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z - distance);
+                    break;
+
+                case Compass.West:
+                    if (WallCheck(Vector3.forward))
+                    {
+                        break;
+                    }
+                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z + distance);
                     break;
             }
         }
@@ -240,5 +330,13 @@ public class PlayerController : MonoBehaviour
             turning = true;
         }
     }
-
+    
+    IEnumerator StepDelay(string direction)
+    {
+        if (moving == false && turning == false)
+        {
+            yield return new WaitForSeconds(.1f);
+            Step(direction);
+        }
+    }
 }
