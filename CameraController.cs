@@ -4,12 +4,10 @@ using UnityEngine;
 
 public class CameraController : MonoBehaviour
 {
-    //private Vector2 cameraDirection;
-    Vector2 cameraDirection;
-    private float min = -20;
-    private float max = 20;
     private float rotationX = 0;
     private float rotationY = 0f;
+    private float min = -20;
+    private float max = 20;
     public float sensitivity;
 
     void Start()
