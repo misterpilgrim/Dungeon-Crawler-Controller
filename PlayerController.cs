@@ -4,27 +4,36 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    private enum Compass { North, South, East, West };
-    private Compass compass; // controller's current NSEW direction
-    private Vector3 target; // coordinates the controller is constantly moving towards
+    public GameObject forwardTarget; // directional targets for vector references
+    public GameObject backTarget;
+    public GameObject leftTarget;
+    public GameObject rightTarget;
+    private Vector3 targetVector; // coordinates the controller is constantly moving towards
     private Quaternion view; // new angle to set controller rotation as for a turn
     private bool moving; // is currently moving?
     private bool turning; // is currently turning?
-    public float movespeed; // preference: 20
-    public float rotatespeed; // preference: 500
-    public float distance; // distance controller travels every step
+    private float movespeed = 20f; // preference: 20
+    private float rotatespeed = 500f; // preference: 500
+    private float distance = 5f; // distance controller travels every step
+    private float delay = .1f; // the amount of delay time between steps
 
     private void Start()
     {
-        target = transform.position;
+        // properly set target positions away from controller based on given distance
+        forwardTarget.transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.z + distance);
+        backTarget.transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.z - distance);
+        leftTarget.transform.position = new Vector3(transform.position.x - distance, transform.position.y, transform.position.z);
+        rightTarget.transform.position = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
+
+        // set target position + rotation as controller's for spawn
+        targetVector = transform.position;
         view = transform.rotation;
-        compass = Compass.North;
     }
 
     void Update()
     {
         // move towards target position + rotation every frame (determined by input)
-        transform.position = Vector3.MoveTowards(transform.position, target, movespeed * Time.deltaTime);
+        transform.position = Vector3.MoveTowards(transform.position, targetVector, movespeed * Time.deltaTime);
         transform.rotation = Quaternion.RotateTowards(transform.rotation, view, rotatespeed * Time.deltaTime);
 
         // manages true/false for if controller is moving or turning
@@ -69,157 +78,41 @@ public class PlayerController : MonoBehaviour
         // handles forward movements
         if (direction == "Forward" && moving == false && turning == false)
         {
-            switch (compass)
+            if (WallCheck(transform.forward))
             {
-                case Compass.North:
-                    if (WallCheck(Vector3.forward))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z + distance);
-                    break;
-
-                case Compass.South:
-                    if (WallCheck(Vector3.back))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z - distance);
-                    break;
-
-                case Compass.East:
-                    if (WallCheck(Vector3.right))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
-                    break;
-
-                case Compass.West:
-                    if (WallCheck(Vector3.left))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x - distance, transform.position.y, transform.position.z);
-                    break;
+                return;
             }
+            targetVector = forwardTarget.transform.position;
         }
 
         // handles backward movements
         else if (direction == "Backward" && moving == false && turning == false)
         {
-            switch (compass)
+            if (WallCheck(transform.forward * -1))
             {
-                case Compass.North:
-                    if (WallCheck(Vector3.back))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z - distance);
-                    break;
-
-                case Compass.South:
-                    if (WallCheck(Vector3.forward))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z + distance);
-                    break;
-
-                case Compass.East:
-                    if (WallCheck(Vector3.left))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x - distance, transform.position.y, transform.position.z);
-                    break;
-
-                case Compass.West:
-                    if (WallCheck(Vector3.right))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
-                    break;
+                return;
             }
+            targetVector = backTarget.transform.position;
         }
 
         // handles left slides
         else if (direction == "Left" && moving == false && turning == false)
         {
-            switch (compass)
+            if (WallCheck(transform.right * -1))
             {
-                case Compass.North:
-                    if (WallCheck(Vector3.left))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x - distance, transform.position.y, transform.position.z);
-                    break;
-
-                case Compass.South:
-                    if (WallCheck(Vector3.right))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
-                    break;
-
-                case Compass.East:
-                    if (WallCheck(Vector3.forward))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z + distance);
-                    break;
-
-                case Compass.West:
-                    if (WallCheck(Vector3.back))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z - distance);
-                    break;
+                return;
             }
+            targetVector = leftTarget.transform.position;
         }
 
         // handles right slides
         else if (direction == "Right" && moving == false && turning == false)
         {
-            switch (compass)
+            if (WallCheck(transform.right))
             {
-                case Compass.North:
-                    if (WallCheck(Vector3.right))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
-                    break;
-
-                case Compass.South:
-                    if (WallCheck(Vector3.left))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x - distance, transform.position.y, transform.position.z);
-                    break;
-
-                case Compass.East:
-                    if (WallCheck(Vector3.back))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z - distance);
-                    break;
-
-                case Compass.West:
-                    if (WallCheck(Vector3.forward))
-                    {
-                        break;
-                    }
-                    target = new Vector3(transform.position.x, transform.position.y, transform.position.z + distance);
-                    break;
+                return;
             }
+            targetVector = rightTarget.transform.position;
         }
     }
 
@@ -229,63 +122,13 @@ public class PlayerController : MonoBehaviour
         // handles left turns
         if (direction == "Left" && turning == false && moving == false)
         {
-            switch (compass)
-            {
-                case Compass.North:
-                    Debug.Log("Facing WEST");
-                    compass = Compass.West;
-                    view = transform.rotation * Quaternion.Euler(0, -90f, 0);
-                    break;
-
-                case Compass.South:
-                    Debug.Log("Facing EAST");
-                    compass = Compass.East;
-                    view = transform.rotation * Quaternion.Euler(0, -90f, 0);
-                    break;
-
-                case Compass.East:
-                    Debug.Log("Facing NORTH");
-                    compass = Compass.North;
-                    view = transform.rotation * Quaternion.Euler(0, -90f, 0);
-                    break;
-
-                case Compass.West:
-                    Debug.Log("Facing SOUTH");
-                    compass = Compass.South;
-                    view = transform.rotation * Quaternion.Euler(0, -90f, 0);
-                    break;
-            }
+            view = transform.rotation * Quaternion.Euler(0, -90f, 0);
         }
 
         // handles right turns
         else if (direction == "Right" && turning == false && moving == false)
         {
-            switch (compass)
-            {
-                case Compass.North:
-                    Debug.Log("Facing EAST");
-                    compass = Compass.East;
-                    view = transform.rotation * Quaternion.Euler(0, 90f, 0);
-                    break;
-
-                case Compass.South:
-                    Debug.Log("Facing WEST");
-                    compass = Compass.West;
-                    view = transform.rotation * Quaternion.Euler(0, 90f, 0);
-                    break;
-
-                case Compass.East:
-                    Debug.Log("Facing SOUTH");
-                    compass = Compass.South;
-                    view = transform.rotation * Quaternion.Euler(0, 90f, 0);
-                    break;
-
-                case Compass.West:
-                    Debug.Log("Facing NORTH");
-                    compass = Compass.North;
-                    view = transform.rotation * Quaternion.Euler(0, 90f, 0);
-                    break;
-            }
+            view = transform.rotation * Quaternion.Euler(0, 90f, 0);
         }
     }
 
@@ -308,7 +151,7 @@ public class PlayerController : MonoBehaviour
     // true/false determination on whether player is currently walking
     void StepCheck()
     {
-        if (transform.position == target)
+        if (transform.position == targetVector)
         {
             moving = false;
         }
@@ -331,11 +174,12 @@ public class PlayerController : MonoBehaviour
         }
     }
     
+    // adjustable pause effect before taking steps
     IEnumerator StepDelay(string direction)
     {
         if (moving == false && turning == false)
         {
-            yield return new WaitForSeconds(.1f);
+            yield return new WaitForSeconds(delay);
             Step(direction);
         }
     }
