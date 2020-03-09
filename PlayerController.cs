@@ -8,26 +8,28 @@ public class PlayerController : MonoBehaviour
     public GameObject backTarget;
     public GameObject leftTarget;
     public GameObject rightTarget;
-    private Vector3 targetVector; // coordinates the controller is constantly moving towards
-    private Quaternion view; // new angle to set controller rotation as for a turn
+    private Vector3 targetVector; // coordinates the player is moving towards every frame
+    private Quaternion view; // new angle to set player rotation as for a turn
+    private float height; // keeps track of player's y axis in relation to the ground
     private bool moving; // is currently moving?
     private bool turning; // is currently turning?
     private float movespeed = 20f; // preference: 20
     private float rotatespeed = 500f; // preference: 500
-    private float distance = 5f; // distance controller travels every step
+    private float distance = 4f; // distance player travels every step
     private float delay = .1f; // the amount of delay time between steps
 
     private void Start()
     {
-        // properly set target positions away from controller based on given distance
+        // properly set target positions away from player based on given distance
         forwardTarget.transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.z + distance);
         backTarget.transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.z - distance);
         leftTarget.transform.position = new Vector3(transform.position.x - distance, transform.position.y, transform.position.z);
         rightTarget.transform.position = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
 
-        // set target position + rotation as controller's for spawn
+        // set target position + rotation as player's for spawn
         targetVector = transform.position;
         view = transform.rotation;
+        height = transform.position.y;
     }
 
     void Update()
@@ -36,7 +38,8 @@ public class PlayerController : MonoBehaviour
         transform.position = Vector3.MoveTowards(transform.position, targetVector, movespeed * Time.deltaTime);
         transform.rotation = Quaternion.RotateTowards(transform.rotation, view, rotatespeed * Time.deltaTime);
 
-        // manages true/false for if controller is moving or turning
+        // managing true/false for moving+turning, floor positioning detection
+        floorPosition();
         StepCheck();
         TurnCheck();
 
@@ -72,13 +75,13 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // determines which direction player takes forward/backward step based off current direction (N/S/E/W)
+    // handles wall check, performs step in direction based off given input (W/S/Q/E keys)
     void Step(string direction)
     {
         // handles forward movements
         if (direction == "Forward" && moving == false && turning == false)
         {
-            if (WallCheck(transform.forward))
+            if (WallDetect(transform.forward))
             {
                 return;
             }
@@ -88,7 +91,7 @@ public class PlayerController : MonoBehaviour
         // handles backward movements
         else if (direction == "Backward" && moving == false && turning == false)
         {
-            if (WallCheck(transform.forward * -1))
+            if (WallDetect(transform.forward * -1))
             {
                 return;
             }
@@ -98,7 +101,7 @@ public class PlayerController : MonoBehaviour
         // handles left slides
         else if (direction == "Left" && moving == false && turning == false)
         {
-            if (WallCheck(transform.right * -1))
+            if (WallDetect(transform.right * -1))
             {
                 return;
             }
@@ -108,7 +111,7 @@ public class PlayerController : MonoBehaviour
         // handles right slides
         else if (direction == "Right" && moving == false && turning == false)
         {
-            if (WallCheck(transform.right))
+            if (WallDetect(transform.right))
             {
                 return;
             }
@@ -116,7 +119,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // determines which direction player faces on left/right turn based off current direction (N/S/E/W)
+    // rotates player in direction based off input (A/D keys)
     void Turn(string direction)
     {
         // handles left turns
@@ -133,7 +136,7 @@ public class PlayerController : MonoBehaviour
     }
 
     // determines whether or not there is a wall in front of player, and how to react
-    bool WallCheck(Vector3 direction)
+    bool WallDetect(Vector3 direction)
     {
         RaycastHit hit;
 
@@ -146,6 +149,21 @@ public class PlayerController : MonoBehaviour
             }
         }
         return false;
+    }
+
+    // adjusts player's height positioning along floor by raycasting down
+    void floorPosition()
+    {
+        if (moving)
+        {
+            RaycastHit hit;
+
+            if (Physics.Raycast(transform.position, Vector3.down, out hit, distance))
+            {
+                height = hit.point.y + (transform.localScale.y / 2);
+                targetVector.y = height;
+            }
+        }
     }
 
     // true/false determination on whether player is currently walking
@@ -173,7 +191,7 @@ public class PlayerController : MonoBehaviour
             turning = true;
         }
     }
-    
+
     // adjustable pause effect before taking steps
     IEnumerator StepDelay(string direction)
     {
