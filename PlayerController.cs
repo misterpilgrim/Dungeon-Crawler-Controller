@@ -13,10 +13,11 @@ public class PlayerController : MonoBehaviour
     private float height; // keeps track of player's y axis in relation to the ground
     private bool moving; // is currently moving?
     private bool turning; // is currently turning?
-    private float movespeed = 20f; // preference: 20
-    private float rotatespeed = 500f; // preference: 500
-    private float distance = 4f; // distance player travels every step
-    private float delay = .1f; // the amount of delay time between steps
+    private bool waiting; // true/false toggle to prevent multiple InputDelay coroutines firing
+    private float movespeed = 17f;
+    private float rotatespeed = 350f;
+    private float distance = 5f; // distance player travels every step
+    private float delay = .15f; // the amount of delay time between steps
 
     private void Start()
     {
@@ -29,7 +30,6 @@ public class PlayerController : MonoBehaviour
         // set target position + rotation as player's for spawn
         targetVector = transform.position;
         view = transform.rotation;
-        height = transform.position.y;
     }
 
     void Update()
@@ -38,104 +38,134 @@ public class PlayerController : MonoBehaviour
         transform.position = Vector3.MoveTowards(transform.position, targetVector, movespeed * Time.deltaTime);
         transform.rotation = Quaternion.RotateTowards(transform.rotation, view, rotatespeed * Time.deltaTime);
 
-        // managing true/false for moving+turning, floor positioning detection
-        floorPosition();
+        // managing true/false for moving + turning, floor positioning detection
+        FloorPosition();
         StepCheck();
         TurnCheck();
 
+        // detect movement inputs
         if (Input.GetKey(KeyCode.W)) // forward
         {
             Debug.Log("Walked FORWARD");
-            StartCoroutine(StepDelay("Forward"));
+            StartCoroutine(InputDelay("Step", "Forward"));
         }
-        else if (Input.GetKeyDown(KeyCode.A)) // left turn
+        else if (Input.GetKey(KeyCode.A)) // left turn
         {
             Debug.Log("Turned LEFT");
-            Turn("Left");
+            StartCoroutine(InputDelay("Turn", "Left"));
         }
         else if (Input.GetKey(KeyCode.S)) // backward
         {
             Debug.Log("Walked BACKWARD");
-            StartCoroutine(StepDelay("Backward"));
+            StartCoroutine(InputDelay("Step", "Backward"));
         }
-        else if (Input.GetKeyDown(KeyCode.D)) // right turn
+        else if (Input.GetKey(KeyCode.D)) // right turn
         {
             Debug.Log("Turned RIGHT");
-            Turn("Right");
+            StartCoroutine(InputDelay("Turn", "Right"));
         }
         else if (Input.GetKey(KeyCode.Q)) // left sidestep
         {
             Debug.Log("Slid LEFT");
-            StartCoroutine(StepDelay("Left"));
+            StartCoroutine(InputDelay("Step", "Left"));
         }
         else if (Input.GetKey(KeyCode.E)) // right sidestep
         {
             Debug.Log("Slid RIGHT");
-            StartCoroutine(StepDelay("Right"));
+            StartCoroutine(InputDelay("Step", "Right"));
         }
     }
 
-    // handles wall check, performs step in direction based off given input (W/S/Q/E keys)
+    // adjustable pause effect before taking steps
+    IEnumerator InputDelay(string type, string direction)
+    {
+        switch (type)
+        {
+            case "Step":
+                if (waiting == false && moving == false && turning == false)
+                {
+                    waiting = true;
+                    yield return new WaitForSeconds(delay);
+
+                    Step(direction);
+                    waiting = false;
+                }
+                break;
+
+            case "Turn":
+                if (waiting == false && moving == false && turning == false)
+                {
+                    waiting = true;
+                    yield return new WaitForSeconds(delay);
+
+                    Turn(direction);
+                    waiting = false;
+                }
+                break;
+        }
+    }
+
+    // performs step in direction based off given input (W/S/Q/E keys)
     void Step(string direction)
     {
-        // handles forward movements
-        if (direction == "Forward" && moving == false && turning == false)
+        if (moving == false && turning == false)
         {
-            if (WallDetect(transform.forward))
+            if (direction == "Forward") // forward movements
             {
-                return;
+                if (WallDetect(transform.forward))
+                {
+                    return;
+                }
+                targetVector = forwardTarget.transform.position;
             }
-            targetVector = forwardTarget.transform.position;
-        }
 
-        // handles backward movements
-        else if (direction == "Backward" && moving == false && turning == false)
-        {
-            if (WallDetect(transform.forward * -1))
+            else if (direction == "Backward") // backward movements
             {
-                return;
+                if (WallDetect(transform.forward * -1))
+                {
+                    return;
+                }
+                targetVector = backTarget.transform.position;
             }
-            targetVector = backTarget.transform.position;
-        }
 
-        // handles left slides
-        else if (direction == "Left" && moving == false && turning == false)
-        {
-            if (WallDetect(transform.right * -1))
+            else if (direction == "Left") // left slides
             {
-                return;
+                if (WallDetect(transform.right * -1))
+                {
+                    return;
+                }
+                targetVector = leftTarget.transform.position;
             }
-            targetVector = leftTarget.transform.position;
-        }
 
-        // handles right slides
-        else if (direction == "Right" && moving == false && turning == false)
-        {
-            if (WallDetect(transform.right))
+            else if (direction == "Right") // right slides
             {
-                return;
+                if (WallDetect(transform.right))
+                {
+                    return;
+                }
+                targetVector = rightTarget.transform.position;
             }
-            targetVector = rightTarget.transform.position;
         }
     }
 
     // rotates player in direction based off input (A/D keys)
     void Turn(string direction)
     {
-        // handles left turns
-        if (direction == "Left" && turning == false && moving == false)
+        if (moving == false && turning == false)
         {
-            view = transform.rotation * Quaternion.Euler(0, -90f, 0);
-        }
+            if (direction == "Left") // left turns
+            {
+                view = transform.rotation * Quaternion.Euler(0, -90f, 0);
+            }
 
-        // handles right turns
-        else if (direction == "Right" && turning == false && moving == false)
-        {
-            view = transform.rotation * Quaternion.Euler(0, 90f, 0);
+            else if (direction == "Right") // right turns
+            {
+                view = transform.rotation * Quaternion.Euler(0, 90f, 0);
+            }
         }
     }
 
-    // determines whether or not there is a wall in front of player, and how to react
+    // returns true/false on whether there is a wall in front of player
     bool WallDetect(Vector3 direction)
     {
         RaycastHit hit;
@@ -152,13 +182,13 @@ public class PlayerController : MonoBehaviour
     }
 
     // adjusts player's height positioning along floor by raycasting down
-    void floorPosition()
+    void FloorPosition()
     {
         if (moving)
         {
             RaycastHit hit;
 
-            if (Physics.Raycast(transform.position, Vector3.down, out hit, distance))
+            if (Physics.Raycast(transform.position, Vector3.down, out hit, distance * 2))
             {
                 height = hit.point.y + (transform.localScale.y / 2);
                 targetVector.y = height;
@@ -169,36 +199,14 @@ public class PlayerController : MonoBehaviour
     // true/false determination on whether player is currently walking
     void StepCheck()
     {
-        if (transform.position == targetVector)
-        {
-            moving = false;
-        }
-        else
-        {
-            moving = true;
-        }
+        if (transform.position == targetVector) moving = false;
+        else moving = true;
     }
 
     // true/false determination on whether player is currently turning
     void TurnCheck()
     {
-        if (transform.rotation == view)
-        {
-            turning = false;
-        }
-        else
-        {
-            turning = true;
-        }
-    }
-
-    // adjustable pause effect before taking steps
-    IEnumerator StepDelay(string direction)
-    {
-        if (moving == false && turning == false)
-        {
-            yield return new WaitForSeconds(delay);
-            Step(direction);
-        }
+        if (transform.rotation == view) turning = false;
+        else turning = true;
     }
 }
