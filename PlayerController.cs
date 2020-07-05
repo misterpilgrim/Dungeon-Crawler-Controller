@@ -8,161 +8,115 @@ public class PlayerController : MonoBehaviour
     public GameObject backTarget;
     public GameObject leftTarget;
     public GameObject rightTarget;
-    private Vector3 targetVector; // coordinates the player is moving towards every frame
-    private Quaternion view; // new angle to set player rotation as for a turn
-    private float height; // keeps track of player's y axis in relation to the ground
-    private bool moving; // is currently moving?
-    private bool turning; // is currently turning?
-    private bool waiting; // true/false toggle to prevent multiple InputDelay coroutines firing
-    private float movespeed = 17f;
-    private float rotatespeed = 350f;
-    private float distance = 5f; // distance player travels every step
-    private float delay = .15f; // the amount of delay time between steps
+    public AudioSource stepSound;
+    [SerializeField] private Vector3 targetVector; // coordinates the player is moving towards every frame
+    [SerializeField] private Quaternion view; // new angle to set player rotation as for a turn
+    [SerializeField] private float height; // keeps track of player's y axis in relation to the ground
+    public bool active { get; set; } // whether or not player accepts inputs
+    public bool moving { get; private set; } // is currently moving?
+    public bool waiting { get; private set; } // true/false toggle to prevent multiple coroutines firing
+    public float movespeed;
+    public float rotatespeed;
+    public float distance;
+    public float delay; // the amount of delay time between steps/turns
 
     private void Start()
     {
+        active = true;
+
         // properly set target positions away from player based on given distance
         forwardTarget.transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.z + distance);
         backTarget.transform.position = new Vector3(transform.position.x, transform.position.y, transform.position.z - distance);
         leftTarget.transform.position = new Vector3(transform.position.x - distance, transform.position.y, transform.position.z);
         rightTarget.transform.position = new Vector3(transform.position.x + distance, transform.position.y, transform.position.z);
 
-        // set target position + rotation as player's for spawn
+        // set target position and rotation as player's for spawn
         targetVector = transform.position;
         view = transform.rotation;
     }
 
     void Update()
     {
-        // move towards target position + rotation every frame (determined by input)
-        transform.position = Vector3.MoveTowards(transform.position, targetVector, movespeed * Time.deltaTime);
-        transform.rotation = Quaternion.RotateTowards(transform.rotation, view, rotatespeed * Time.deltaTime);
-
-        // managing true/false for moving + turning, floor positioning detection
-        FloorPosition();
-        StepCheck();
-        TurnCheck();
-
+        UpdatePosition();
+        MoveCheck();
+        
         // detect movement inputs
-        if (Input.GetKey(KeyCode.W)) // forward
+        if (active && !waiting && !moving)
         {
-            Debug.Log("Walked FORWARD");
-            StartCoroutine(InputDelay("Step", "Forward"));
-        }
-        else if (Input.GetKey(KeyCode.A)) // left turn
-        {
-            Debug.Log("Turned LEFT");
-            StartCoroutine(InputDelay("Turn", "Left"));
-        }
-        else if (Input.GetKey(KeyCode.S)) // backward
-        {
-            Debug.Log("Walked BACKWARD");
-            StartCoroutine(InputDelay("Step", "Backward"));
-        }
-        else if (Input.GetKey(KeyCode.D)) // right turn
-        {
-            Debug.Log("Turned RIGHT");
-            StartCoroutine(InputDelay("Turn", "Right"));
-        }
-        else if (Input.GetKey(KeyCode.Q)) // left sidestep
-        {
-            Debug.Log("Slid LEFT");
-            StartCoroutine(InputDelay("Step", "Left"));
-        }
-        else if (Input.GetKey(KeyCode.E)) // right sidestep
-        {
-            Debug.Log("Slid RIGHT");
-            StartCoroutine(InputDelay("Step", "Right"));
+            // forward
+            if (Input.GetKey(KeyCode.W)) StartCoroutine(InputDelay("Step", "Forward"));
+            // left turn
+            else if (Input.GetKey(KeyCode.A)) StartCoroutine(InputDelay("Turn", "Left"));
+            // backward
+            else if (Input.GetKey(KeyCode.S)) StartCoroutine(InputDelay("Step", "Backward"));
+            // right turn
+            else if (Input.GetKey(KeyCode.D)) StartCoroutine(InputDelay("Turn", "Right"));
+            // left sidestep
+            else if (Input.GetKey(KeyCode.Q)) StartCoroutine(InputDelay("Step", "Left"));
+            // right sidestep
+            else if (Input.GetKey(KeyCode.E)) StartCoroutine(InputDelay("Step", "Right"));
         }
     }
 
-    // adjustable pause effect before taking steps
+    // pause effect before taking steps
     IEnumerator InputDelay(string type, string direction)
     {
+        // wait before stepping/turning
+        waiting = true;
+        yield return new WaitForSeconds(delay);
+
+        // commence step/turn after wait
         switch (type)
         {
             case "Step":
-                if (waiting == false && moving == false && turning == false)
-                {
-                    waiting = true;
-                    yield return new WaitForSeconds(delay);
-
-                    Step(direction);
-                    waiting = false;
-                }
+                Step(direction);
+                stepSound.Play();
                 break;
 
             case "Turn":
-                if (waiting == false && moving == false && turning == false)
-                {
-                    waiting = true;
-                    yield return new WaitForSeconds(delay);
-
-                    Turn(direction);
-                    waiting = false;
-                }
+                Turn(direction);
                 break;
         }
+        // no longer waiting, ready for next input
+        waiting = false;
     }
 
     // performs step in direction based off given input (W/S/Q/E keys)
     void Step(string direction)
     {
-        if (moving == false && turning == false)
+        if (moving) return;
+
+        switch (direction)
         {
-            if (direction == "Forward") // forward movements
-            {
-                if (WallDetect(transform.forward))
-                {
-                    return;
-                }
+            case "Forward": // forward movements
+                if (WallDetect(transform.forward)) return;
                 targetVector = forwardTarget.transform.position;
-            }
+                break;
 
-            else if (direction == "Backward") // backward movements
-            {
-                if (WallDetect(transform.forward * -1))
-                {
-                    return;
-                }
+            case "Backward": // backward movements
+                if (WallDetect(transform.forward * -1)) return;
                 targetVector = backTarget.transform.position;
-            }
+                break;
 
-            else if (direction == "Left") // left slides
-            {
-                if (WallDetect(transform.right * -1))
-                {
-                    return;
-                }
+            case "Left": // left slides
+                if (WallDetect(transform.right * -1)) return;
                 targetVector = leftTarget.transform.position;
-            }
+                break;
 
-            else if (direction == "Right") // right slides
-            {
-                if (WallDetect(transform.right))
-                {
-                    return;
-                }
+            case "Right": // right slides
+                if (WallDetect(transform.right)) return;
                 targetVector = rightTarget.transform.position;
-            }
+                break;
         }
     }
 
     // rotates player in direction based off input (A/D keys)
     void Turn(string direction)
     {
-        if (moving == false && turning == false)
-        {
-            if (direction == "Left") // left turns
-            {
-                view = transform.rotation * Quaternion.Euler(0, -90f, 0);
-            }
+        if (moving) return;
 
-            else if (direction == "Right") // right turns
-            {
-                view = transform.rotation * Quaternion.Euler(0, 90f, 0);
-            }
-        }
+        if (direction == "Left") view = transform.rotation * Quaternion.Euler(0, -90f, 0);
+        else if (direction == "Right") view = transform.rotation * Quaternion.Euler(0, 90f, 0);
     }
 
     // returns true/false on whether there is a wall in front of player
@@ -172,41 +126,32 @@ public class PlayerController : MonoBehaviour
 
         if (Physics.Raycast(transform.position, direction, out hit, distance))
         {
-            if (hit.collider.tag == "Wall")
-            {
-                Debug.Log("Wall hit");
-                return true;
-            }
+            if (hit.collider.tag == "Non-Wall") return false;
+            else return true;
         }
-        return false;
+        else return false;
     }
 
-    // adjusts player's height positioning along floor by raycasting down
-    void FloorPosition()
+    // adjusts player's positioning and rotation
+    void UpdatePosition()
     {
-        if (moving)
+        RaycastHit hit;
+
+        if (Physics.Raycast(transform.position, Vector3.down, out hit, distance * 2))
         {
-            RaycastHit hit;
-
-            if (Physics.Raycast(transform.position, Vector3.down, out hit, distance * 2))
-            {
-                height = hit.point.y + (transform.localScale.y / 2);
-                targetVector.y = height;
-            }
+            height = hit.point.y + (transform.localScale.y / 2);
+            targetVector.y = height;
         }
+
+        // move towards target position + rotation every frame (determined by input)
+        transform.position = Vector3.MoveTowards(transform.position, targetVector, movespeed * Time.deltaTime);
+        transform.rotation = Quaternion.RotateTowards(transform.rotation, view, rotatespeed * Time.deltaTime);
     }
 
-    // true/false determination on whether player is currently walking
-    void StepCheck()
+    // true/false determination on whether player is currently stepping/turning
+    void MoveCheck()
     {
-        if (transform.position == targetVector) moving = false;
-        else moving = true;
-    }
-
-    // true/false determination on whether player is currently turning
-    void TurnCheck()
-    {
-        if (transform.rotation == view) turning = false;
-        else turning = true;
+        if (transform.position != targetVector || transform.rotation != view) moving = true;
+        else moving = false;
     }
 }
